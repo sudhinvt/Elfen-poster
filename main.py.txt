@@ -2,20 +2,16 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# 1. ELFEN Imports
+
 from elfen.extractor import Extractor
 
-# 2. Machine Learning & Analysis Imports
+
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix
 import shap
 
-# ==========================================
-# STEP 1: LOAD / PREPARE DATASET
-# ==========================================
-# For testing, we set up a small representative dataset DataFrame.
-# In production, replace this with your actual CSV/dataset containing text and labels (0 = Human, 1 = LLM).
+
 
 data = {
     "text": [
@@ -31,16 +27,11 @@ data = {
 
 df = pd.DataFrame(data)
 
-# ==========================================
-# STEP 2: FEATURE EXTRACTION WITH ELFEN
-# ==========================================
+
 print("Extracting features using elfen...")
 
-# Initialize elfen Extractor
-# Language: 'en' (supports spacy/stanza models under the hood)
 extractor = Extractor(language="en")
 
-# Define target feature groups to extract
 feature_groups = [
     "lexical_richness",  # MATTR, MTLD, TTR, Hapax Legomena
     "dependency",        # Tree depth, branching factor, ramification
@@ -49,8 +40,6 @@ feature_groups = [
     "pos"                # POS distributions and POS variability
 ]
 
-# Extract features into a pandas DataFrame
-# elfen extracts hundreds of item-level features across these categories
 features_df = extractor.extract(
     texts=df["text"].tolist(),
     feature_groups=feature_groups
@@ -58,26 +47,19 @@ features_df = extractor.extract(
 
 print(f"Extracted {features_df.shape[1]} features for {features_df.shape[0]} text items.")
 
-# Clean up missing values/infinities if any exist
 features_df = features_df.fillna(0)
 features_df = features_df.replace([np.inf, -np.inf], 0)
 
-# ==========================================
-# STEP 3: MODEL TRAINING
-# ==========================================
 X = features_df
 y = df["label"]
 
-# Train / Test split
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.33, random_state=42, stratify=y
 )
 
-# Train an interpretable classifier (Random Forest)
 model = RandomForestClassifier(n_estimators=100, random_state=42)
 model.fit(X_train, y_train)
 
-# Evaluation
 y_pred = model.predict(X_test)
 y_prob = model.predict_proba(X_test)[:, 1]
 
@@ -85,16 +67,12 @@ print("\n--- Model Performance ---")
 print(classification_report(y_test, y_pred))
 print(f"ROC-AUC Score: {roc_auc_score(y_test, y_prob):.4f}")
 
-# ==========================================
-# STEP 4: INTERPRETABILITY & SHAP ANALYSIS
-# ==========================================
 print("\nGenerating SHAP feature importance analysis...")
 
-# Compute SHAP values to reveal which linguistic features drive predictions
 explainer = shap.TreeExplainer(model)
 shap_values = explainer.shap_values(X_test)
 
-# Plot SHAP summary plot (Top 10 features)
+
 plt.figure(figsize=(10, 6))
 shap.summary_plot(
     shap_values[1] if isinstance(shap_values, list) else shap_values, 
